@@ -33,8 +33,8 @@ class Pipeline:
     def __init__(self):
         # Queues
         self.audio_queue = queue.Queue(maxsize=50)
-        self.chunk_queue = queue.Queue(maxsize=10)
-        self.transcript_queue = queue.Queue(maxsize=10)
+        self.chunk_queue = queue.Queue(maxsize=5)
+        self.transcript_queue = queue.Queue(maxsize=5)
 
         # Shared stop event
         self.stop_event = threading.Event()

@@ -17,6 +17,20 @@ from itqani import config
 
 logger = logging.getLogger(__name__)
 
+
+def _is_looping(text: str) -> bool:
+    """Détecte une hallucination en boucle (même séquence répétée > 3 fois)."""
+    words = text.split()
+    if len(words) < 9:
+        return False
+    for n in range(2, 5):  # bigrammes, trigrammes, quadrigrammes
+        for i in range(len(words) - n):
+            seq = " ".join(words[i:i + n])
+            if text.count(seq) > 3:
+                return True
+    return False
+
+
 # Hallucinations connues de Whisper sur les silences ou courts clips
 _WHISPER_HALLUCINATIONS = {
     "اشتركوا في القناة",
@@ -62,6 +76,7 @@ class Transcriber:
         # Rolling buffer des dernières transcriptions arabes
         # Injecté dans initial_prompt pour que Whisper connaisse le contexte du discours
         self._recent: list[str] = []
+        self._last_lang_prob: float = 1.0
 
     def _build_prompt(self) -> str:
         """Construit un prompt dynamique à partir des dernières transcriptions."""
@@ -80,10 +95,11 @@ class Transcriber:
             language="ar",
             beam_size=config.WHISPER_BEAM_SIZE,
             initial_prompt=self._build_prompt(),
-            condition_on_previous_text=True,
+            condition_on_previous_text=False,
             vad_filter=False,
             temperature=0,
             word_timestamps=False,
+            no_speech_threshold=0.5,
         )
         text = " ".join(seg.text.strip() for seg in segments).strip()
         elapsed = time.perf_counter() - t0
@@ -94,6 +110,7 @@ class Transcriber:
             info.language_probability,
             text[:120],
         )
+        self._last_lang_prob = info.language_probability
         return text
 
     def run(self):
@@ -109,13 +126,21 @@ class Transcriber:
                 logger.debug("Empty transcription, skipping")
                 continue
             if text in _WHISPER_HALLUCINATIONS or any(h in text for h in _WHISPER_HALLUCINATIONS):
-                logger.debug("Hallucination détectée, ignorée : %s", text)
+                logger.debug("Hallucination connue ignorée : %s", text)
                 continue
 
-            # Mémoriser pour enrichir le prochain prompt
-            self._recent.append(text)
-            if len(self._recent) > config.WHISPER_CONTEXT_SENTENCES:
-                self._recent.pop(0)
+            if _is_looping(text):
+                logger.warning("Hallucination en boucle détectée, contexte réinitialisé : %s", text[:80])
+                self._recent.clear()  # casser la cascade
+                continue
+
+            # Mémoriser pour enrichir le prochain prompt (seulement si confiance élevée)
+            if self._last_lang_prob >= 0.8:
+                self._recent.append(text)
+                if len(self._recent) > config.WHISPER_CONTEXT_SENTENCES:
+                    self._recent.pop(0)
+            else:
+                logger.debug("Low confidence (%.2f), not adding to context: %s", self._last_lang_prob, text[:60])
 
             try:
                 self._transcript_q.put(text, timeout=2)

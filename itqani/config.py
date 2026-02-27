@@ -10,21 +10,24 @@ load_dotenv(_ENV_FILE)
 SAMPLE_RATE = 16000
 CHUNK_FRAMES = 512  # required by silero-vad @ 16kHz
 
-# VAD — optimisé pour obtenir des phrases complètes
-VAD_THRESHOLD = 0.5            # haut : parole forte toujours au-dessus, rejette le bruit
-VAD_PRE_ROLL_FRAMES = 8        # ~256ms de contexte avant détection
-SILENCE_DURATION_MS = 800      # attendre 800ms de silence = fin de phrase naturelle
-CHUNK_MAX_DURATION_S = 10      # forcer la coupure à 10s max
-CHUNK_MIN_DURATION_S = 1.0     # ignorer les bruits et micro-fragments < 1s
+# VAD — chunking hybride temporel + dip-aligné
+VAD_THRESHOLD = 0.5
+VAD_PRE_ROLL_FRAMES = 5          # ~160ms
+VAD_MIN_RMS = 0.012
+CHUNK_TARGET_S = 4.0             # cible : flush ~4 secondes
+CHUNK_MIN_S = 2.0                # jamais flush avant 2s
+CHUNK_MAX_S = 7.0                # forcer la coupure à 7s max
+CHUNK_DIP_WINDOW = 10            # fenêtre glissante pour détecter les dips
+CHUNK_DIP_SOFT_THRESHOLD = 0.35  # prob en dessous = bon moment pour couper
 
 # Whisper — optimisé vitesse + qualité
 WHISPER_MODEL = "large-v3-turbo"
 WHISPER_COMPUTE_TYPE = "int8_float16"
 WHISPER_DEVICE = "cuda"
-WHISPER_BEAM_SIZE = 2          # beam 2 = rapide sur parole claire et forte
+WHISPER_BEAM_SIZE = 1            # greedy = plus rapide, suffisant pour parole claire
 WHISPER_CPU_THREADS = 4
 WHISPER_INITIAL_PROMPT = "خطبة جمعة باللغة العربية الفصحى والدارجة المغربية."
-WHISPER_CONTEXT_SENTENCES = 3  # nb de transcriptions récentes injectées dans le prompt
+WHISPER_CONTEXT_SENTENCES = 2    # réduit le risque de cascade
 
 # OpenRouter / LLM
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -35,7 +38,7 @@ OPENROUTER_TEMPERATURE = 0.1
 # Translation resilience
 TRANSLATION_MAX_RETRIES = 3
 TRANSLATION_RETRY_BASE_DELAY = 0.5
-TRANSLATION_BATCH_SIZE = 4         # regroupe jusqu'à 4 chunks avant traduction
+TRANSLATION_BATCH_SIZE = 2         # max 2 chunks, on envoie plus vite
 TRANSLATION_MIN_ARABIC_CHARS = 15  # ignorer les fragments trop courts
 
 # Context
