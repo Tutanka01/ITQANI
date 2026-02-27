@@ -180,15 +180,18 @@ class Translator:
                     await asyncio.sleep(delay)
                     continue
                 logger.error("OpenRouter HTTP error: %s", exc)
+                # Toujours fermer le chunk actif côté frontend pour éviter le texte mélangé
+                self._broadcast(json.dumps({"type": "chunk_end", "content": ""}))
                 self._broadcast(
-                    json.dumps({"type": "error", "content": f"API error: {code}"})
+                    json.dumps({"type": "error", "content": f"Erreur API ({code})"})
                 )
                 return
 
             except Exception as exc:
                 logger.error("Translation error: %s", exc, exc_info=True)
+                self._broadcast(json.dumps({"type": "chunk_end", "content": ""}))
                 self._broadcast(
-                    json.dumps({"type": "error", "content": str(exc)})
+                    json.dumps({"type": "error", "content": "Erreur de traduction"})
                 )
                 return
 

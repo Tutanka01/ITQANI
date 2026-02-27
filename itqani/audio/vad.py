@@ -73,8 +73,16 @@ class VADChunker:
             logger.debug("VAD: chunk too short (%d frames), discarded", len(buffer))
             return
         audio = np.concatenate(buffer).astype(np.float32) / 32768.0
+
+        # Normalisation : ramène le volume à un niveau cible
+        # Évite que Whisper rate les mots prononcés trop doucement
+        rms = np.sqrt(np.mean(audio ** 2))
+        if rms > 0.001:
+            audio = audio * (0.1 / rms)
+            audio = np.clip(audio, -1.0, 1.0)
+
         duration = len(audio) / config.SAMPLE_RATE
-        logger.info("VAD: flushing chunk (%.2fs)", duration)
+        logger.info("VAD: flushing chunk (%.2fs, rms=%.4f)", duration, rms)
         try:
             self._chunk_q.put(audio, timeout=2)
         except queue.Full:
