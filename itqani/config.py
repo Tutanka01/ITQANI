@@ -11,10 +11,10 @@ SAMPLE_RATE = 16000
 CHUNK_FRAMES = 512  # required by silero-vad @ 16kHz
 
 # VAD
-VAD_THRESHOLD = 0.5
-SILENCE_DURATION_MS = 700    # attendre 700ms de silence avant de couper
+VAD_THRESHOLD = 0.4            # légèrement plus sensible
+SILENCE_DURATION_MS = 600    # attendre 600ms de silence avant de couper
 CHUNK_MAX_DURATION_S = 15    # forcer la coupure à 15s max
-CHUNK_MIN_DURATION_S = 2.0   # ignorer les chunks < 2s (bruit, hallucinations)
+CHUNK_MIN_DURATION_S = 0.8   # ignorer uniquement les très courts bruits < 0.8s
 
 # Whisper
 WHISPER_MODEL = "large-v3-turbo"
