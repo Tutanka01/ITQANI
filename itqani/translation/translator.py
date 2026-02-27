@@ -206,6 +206,16 @@ class Translator:
             loop.close()
         logger.info("Translator stopped")
 
+    def _drain_queue(self) -> list[str]:
+        """Récupère tous les chunks disponibles (max TRANSLATION_BATCH_SIZE)."""
+        items = []
+        while len(items) < config.TRANSLATION_BATCH_SIZE:
+            try:
+                items.append(self._transcript_q.get_nowait())
+            except queue.Empty:
+                break
+        return items
+
     async def _run_loop(self):
         # Persistent client — connexion TCP/TLS réutilisée entre les traductions
         async with httpx.AsyncClient(
@@ -213,10 +223,18 @@ class Translator:
             limits=httpx.Limits(max_keepalive_connections=2, max_connections=4),
         ) as client:
             while not self._stop.is_set():
+                # Attendre le premier chunk
                 try:
-                    arabic_text = self._transcript_q.get_nowait()
+                    first = self._transcript_q.get_nowait()
                 except queue.Empty:
                     await asyncio.sleep(0.05)
                     continue
+
+                # Drainer les chunks déjà en attente pour les regrouper
+                batch = [first] + self._drain_queue()
+                arabic_text = " ".join(batch)
+
+                if len(batch) > 1:
+                    logger.info("Batch de %d chunks envoyé au LLM", len(batch))
 
                 await self._process_one(arabic_text, client)
