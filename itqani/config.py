@@ -10,12 +10,12 @@ load_dotenv(_ENV_FILE)
 SAMPLE_RATE = 16000
 CHUNK_FRAMES = 512  # required by silero-vad @ 16kHz
 
-# VAD — optimisé pour parole forte et rapide
+# VAD — optimisé pour obtenir des phrases complètes
 VAD_THRESHOLD = 0.5            # haut : parole forte toujours au-dessus, rejette le bruit
 VAD_PRE_ROLL_FRAMES = 8        # ~256ms de contexte avant détection
-SILENCE_DURATION_MS = 350      # parole rapide = pauses courtes
-CHUNK_MAX_DURATION_S = 8       # forcer la coupure toutes les 8s max
-CHUNK_MIN_DURATION_S = 0.4     # ignorer uniquement les bruits < 0.4s
+SILENCE_DURATION_MS = 800      # attendre 800ms de silence = fin de phrase naturelle
+CHUNK_MAX_DURATION_S = 10      # forcer la coupure à 10s max
+CHUNK_MIN_DURATION_S = 1.0     # ignorer les bruits et micro-fragments < 1s
 
 # Whisper — optimisé vitesse + qualité
 WHISPER_MODEL = "large-v3-turbo"
@@ -33,9 +33,10 @@ OPENROUTER_MODEL = "google/gemini-3-flash-preview"
 OPENROUTER_TEMPERATURE = 0.1
 
 # Translation resilience
-TRANSLATION_MAX_RETRIES = 3       # tentatives max en cas d'erreur API
-TRANSLATION_RETRY_BASE_DELAY = 0.5  # secondes, doublé à chaque tentative
-TRANSLATION_BATCH_SIZE = 3        # max chunks à regrouper en une seule traduction
+TRANSLATION_MAX_RETRIES = 3
+TRANSLATION_RETRY_BASE_DELAY = 0.5
+TRANSLATION_BATCH_SIZE = 4         # regroupe jusqu'à 4 chunks avant traduction
+TRANSLATION_MIN_ARABIC_CHARS = 15  # ignorer les fragments trop courts
 
 # Context
 CONTEXT_WINDOW_SENTENCES = 4
@@ -48,25 +49,25 @@ SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 8000
 
 SYSTEM_PROMPT = """\
-Tu es un traducteur expert en arabe islamique classique et dialecte marocain vers le français.
+Tu es interprète simultané d'une khutba du vendredi, arabe → français.
 
-CONTEXTE : Tu reçois en temps réel des fragments d'une khutba du vendredi (sermon islamique). \
-Chaque passage est un extrait d'un discours continu — les phrases peuvent être incomplètes. \
-Traduis naturellement en t'appuyant sur le contexte fourni pour assurer la cohérence.
+MISSION : Produire un français immédiatement compréhensible par un francophone \
+qui ne comprend pas l'arabe. Chaque passage doit former une pensée complète et fluide.
 
-RÈGLES ABSOLUES :
-1. Traduis fidèlement le sens, même si le fragment semble incomplet.
-2. NE TRADUIS JAMAIS les termes islamiques suivants — conserve-les tels quels :
-   tawakkul, akhira, deen, iman, taqwa, sabr, ikhlas, zuhd, wara', ihsan,
-   salat, zakat, sawm, hajj, shahada, sura, ayah, hadith, sunnah, fiqh,
-   halal, haram, makruh, wajib, Jannah, Jahannam, barzakh, qiyama, mizan,
-   sirat, Ummah, khalifa, wali, alim, imam, sheikh, khatib,
-   barakah, rizq, nafs, ruh, qalb, aql, fitrah.
-3. Citations coraniques → préfixe [Coran]. Hadiths → préfixe [Hadith].
-4. Registre formel et solennel.
-5. Dialecte marocain → traduis le sens sans le signaler.
-6. Traduis UNIQUEMENT le passage fourni, sans ajouts ni commentaires.
-7. Passage vraiment incompréhensible → [inaudible].
+RÈGLES :
+1. Produis des phrases françaises naturelles et complètes. \
+   Si le passage arabe est un fragment, reformule-le en phrase grammaticalement correcte.
+2. Assure la continuité avec les traductions précédentes (contexte fourni). \
+   Le résultat doit sembler être un discours continu, pas des phrases isolées.
+3. NE TRADUIS JAMAIS ces termes islamiques — conserve-les tels quels : \
+   tawakkul, akhira, deen, iman, taqwa, sabr, ikhlas, ihsan, \
+   salat, zakat, sawm, hajj, shahada, ayah, hadith, sunnah, \
+   halal, haram, Jannah, Jahannam, qiyama, Ummah, imam, sheikh, khatib, \
+   barakah, rizq, nafs, ruh, fitrah.
+4. [Coran] pour les versets, [Hadith] pour les hadiths.
+5. Registre solennel et formel.
+6. Dialecte marocain → traduis le sens, ne le signale pas.
+7. Incompréhensible → [inaudible].
 
-FORMAT : Texte français uniquement, sans commentaires, sans guillemets.\
+FORMAT : Français uniquement. Pas de guillemets, pas de commentaires.\
 """

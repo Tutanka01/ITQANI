@@ -237,6 +237,11 @@ class Translator:
                 batch = [first] + self._drain_queue()
                 arabic_text = " ".join(batch)
 
+                # Ignorer les fragments trop courts (bruit, hallucination résiduelle)
+                if len(arabic_text) < config.TRANSLATION_MIN_ARABIC_CHARS:
+                    logger.debug("Fragment trop court ignoré (%d chars): %s", len(arabic_text), arabic_text)
+                    continue
+
                 if len(batch) > 1:
                     logger.info("Batch de %d chunks envoyé au LLM", len(batch))
 
