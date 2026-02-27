@@ -27,7 +27,7 @@ WHISPER_INITIAL_PROMPT = "بسم الله الرحمن الرحيم. هذه خط
 # OpenRouter / LLM
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
+OPENROUTER_MODEL = "google/gemini-3-flash-preview"
 OPENROUTER_TEMPERATURE = 0.1
 
 # Translation resilience
