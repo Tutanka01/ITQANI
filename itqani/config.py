@@ -19,6 +19,7 @@ CHUNK_MIN_S = 2.0                # jamais flush avant 2s
 CHUNK_MAX_S = 7.0                # forcer la coupure à 7s max
 CHUNK_DIP_WINDOW = 10            # fenêtre glissante pour détecter les dips
 CHUNK_DIP_SOFT_THRESHOLD = 0.35  # prob en dessous = bon moment pour couper
+CHUNK_SILENCE_S = 0.8            # vrai silence pour flush (800ms — les respirations d'imam sont plus courtes)
 
 # Whisper — optimisé vitesse + qualité
 WHISPER_MODEL = "large-v3-turbo"

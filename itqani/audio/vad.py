@@ -40,7 +40,7 @@ _FRAME_DURATION_S = config.CHUNK_FRAMES / config.SAMPLE_RATE  # ~0.032s per fram
 _TARGET_FRAMES = int(config.CHUNK_TARGET_S / _FRAME_DURATION_S)
 _MIN_FRAMES = int(config.CHUNK_MIN_S / _FRAME_DURATION_S)
 _MAX_FRAMES = int(config.CHUNK_MAX_S / _FRAME_DURATION_S)
-_SILENCE_FRAMES = int(0.5 / _FRAME_DURATION_S)  # 500ms of silence → flush
+_SILENCE_FRAMES = int(config.CHUNK_SILENCE_S / _FRAME_DURATION_S)  # ~800ms of true silence → flush
 
 
 def _load_silero_vad():
@@ -149,9 +149,12 @@ class VADChunker:
                 probs.append(prob)
                 silence_count += 1
 
-                # True silence (500ms) → normal flush
+                # True silence (800ms) → normal flush
                 if silence_count >= _SILENCE_FRAMES:
                     logger.debug("VAD: silence detected (%.0fms), flushing", silence_count * _FRAME_DURATION_S * 1000)
+                    # Seed pre_roll with tail of buffer so we never lose the
+                    # onset of the next word after a breath/pause
+                    pre_roll = list(buffer[-config.VAD_PRE_ROLL_FRAMES:])
                     self._flush(buffer)
                     buffer = []
                     probs = []
