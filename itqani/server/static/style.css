@@ -1,0 +1,108 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --gold: #d4a843;
+  --bg: #0a0a0a;
+  --text-active: #ffffff;
+  --text-past: #9a9a9a;
+  --status-bar-h: 32px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text-active);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  overflow: hidden;
+}
+
+/* ── Status bar ─────────────────────────────────────── */
+#status-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--status-bar-h);
+  background: #111;
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: #777;
+  z-index: 10;
+  border-bottom: 1px solid #222;
+}
+
+#status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #cc3333;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+#status-dot.connected {
+  background: #44cc44;
+}
+
+#status-label {
+  flex: 1;
+}
+
+/* ── Scroll container ───────────────────────────────── */
+#scroll-container {
+  position: fixed;
+  top: var(--status-bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  padding: 2rem clamp(1rem, 6vw, 8rem) 6rem;
+  scroll-behavior: smooth;
+}
+
+/* ── Chunks ─────────────────────────────────────────── */
+.chunk {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  transition: opacity 1.5s ease, color 1.5s ease;
+}
+
+/* Active (current) chunk */
+.chunk.active {
+  color: var(--text-active);
+  border-left: 4px solid var(--gold);
+  padding-left: 1rem;
+}
+
+/* Past chunks — fade progressively */
+.chunk.past-1 { opacity: 0.75; color: var(--text-past); }
+.chunk.past-2 { opacity: 0.55; color: var(--text-past); }
+.chunk.past-3 { opacity: 0.35; color: var(--text-past); }
+.chunk.past-4 { opacity: 0.20; color: var(--text-past); }
+.chunk.past-old { opacity: 0.10; color: var(--text-past); }
+
+/* Cursor blink on active chunk */
+.chunk.active::after {
+  content: '▌';
+  color: var(--gold);
+  animation: blink 1s step-end infinite;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ── Scrollbar ──────────────────────────────────────── */
+#scroll-container::-webkit-scrollbar { width: 6px; }
+#scroll-container::-webkit-scrollbar-track { background: #111; }
+#scroll-container::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
