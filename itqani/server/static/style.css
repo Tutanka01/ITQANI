@@ -5,104 +5,154 @@
 }
 
 :root {
-  --gold: #d4a843;
-  --bg: #0a0a0a;
-  --text-active: #ffffff;
-  --text-past: #9a9a9a;
-  --status-bar-h: 32px;
+  --gold:      #d4a843;
+  --bg:        #090909;
+  --status-h:  36px;
+  --pad-h:     clamp(1.5rem, 7vw, 10rem);
+  --font-sz:   clamp(2rem, 3.2vw, 3rem);
+  --line-h:    1.65;
+  --chunk-gap: 1.4rem;
+  --fade-dur:  0.85s;
 }
 
 html, body {
   height: 100%;
   background: var(--bg);
-  color: var(--text-active);
+  color: #fff;
   font-family: 'Georgia', 'Times New Roman', serif;
   overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Status bar ─────────────────────────────────────── */
+/* ─── Barre de statut ─────────────────────────────────────────── */
+
 #status-bar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--status-bar-h);
-  background: #111;
+  top: 0; left: 0; right: 0;
+  height: var(--status-h);
+  background: rgba(9, 9, 9, 0.97);
+  border-bottom: 1px solid #1a1a1a;
   display: flex;
   align-items: center;
-  padding: 0 1rem;
   gap: 0.5rem;
-  font-size: 0.75rem;
-  font-family: monospace;
-  color: #777;
-  z-index: 10;
-  border-bottom: 1px solid #222;
+  padding: 0 1.2rem;
+  font-size: 0.72rem;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  color: #505050;
+  z-index: 100;
 }
 
 #status-dot {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #cc3333;
-  transition: background 0.3s;
+  background: #551111;
+  transition: background 0.4s;
   flex-shrink: 0;
 }
 
 #status-dot.connected {
-  background: #44cc44;
+  background: #22aa44;
+  box-shadow: 0 0 6px #22aa4455;
 }
 
-#status-label {
-  flex: 1;
-}
+#status-label { flex: 1; }
 
-/* ── Scroll container ───────────────────────────────── */
-#scroll-container {
+#clock { letter-spacing: 0.06em; }
+
+/* ─── Scène téléprompter ─────────────────────────────────────────
+   Principe : flex-column + justify-content:flex-end
+   → Les chunks s'empilent depuis le bas.
+   → Le chunk le plus récent (dernier enfant) reste toujours en bas.
+   → Les anciens chunks remontent naturellement et disparaissent
+     hors du bord supérieur (overflow:hidden).
+   → Le dégradé ::before masque la zone de sortie en haut.
+──────────────────────────────────────────────────────────────── */
+
+#stage {
   position: fixed;
-  top: var(--status-bar-h);
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow-y: auto;
-  padding: 2rem clamp(1rem, 6vw, 8rem) 6rem;
-  scroll-behavior: smooth;
+  top: var(--status-h);
+  left: 0; right: 0; bottom: 0;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;   /* ancre le contenu en bas */
+  gap: var(--chunk-gap);
+  padding: 0 var(--pad-h) 6vh;
+  overflow: hidden;            /* clips les chunks qui remontent en haut */
 }
 
-/* ── Chunks ─────────────────────────────────────────── */
+/* Masque dégradé — absorbe les textes anciens qui quittent l'écran par le haut */
+#stage::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: linear-gradient(
+    to bottom,
+    var(--bg) 25%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ─── Chunk (bloc de traduction) ──────────────────────────────── */
+
 .chunk {
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
-  line-height: 1.6;
-  margin-bottom: 2rem;
-  transition: opacity 1.5s ease, color 1.5s ease;
+  font-size: var(--font-sz);
+  line-height: var(--line-h);
+  flex-shrink: 0;
+  transition: opacity var(--fade-dur) ease;
+  /* Animation d'entrée : glisse depuis le bas, fade in */
+  animation: apparition 0.4s ease-out both;
 }
 
-/* Active (current) chunk */
+@keyframes apparition {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Chunk actif (texte en cours de streaming) ───────────────── */
+
 .chunk.active {
-  color: var(--text-active);
-  border-left: 4px solid var(--gold);
-  padding-left: 1rem;
+  opacity: 1;
+  color: #ffffff;
+  border-left: 3px solid var(--gold);
+  padding-left: 1.2rem;
+  margin-left: calc(-1.2rem - 3px);  /* compense le border pour aligner au texte */
 }
 
-/* Past chunks — fade progressively */
-.chunk.past-1 { opacity: 0.75; color: var(--text-past); }
-.chunk.past-2 { opacity: 0.55; color: var(--text-past); }
-.chunk.past-3 { opacity: 0.35; color: var(--text-past); }
-.chunk.past-4 { opacity: 0.20; color: var(--text-past); }
-.chunk.past-old { opacity: 0.10; color: var(--text-past); }
-
-/* Cursor blink on active chunk */
+/* Curseur clignotant pendant le streaming */
 .chunk.active::after {
   content: '▌';
   color: var(--gold);
-  animation: blink 1s step-end infinite;
-  margin-left: 2px;
+  animation: clignote 0.9s step-end infinite;
+  margin-left: 3px;
 }
 
-@keyframes blink {
+@keyframes clignote {
   50% { opacity: 0; }
 }
 
-/* ── Scrollbar ──────────────────────────────────────── */
-#scroll-container::-webkit-scrollbar { width: 6px; }
-#scroll-container::-webkit-scrollbar-track { background: #111; }
-#scroll-container::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+/* ─── Chunks passés — fondu progressif vers le haut ──────────── */
+
+.chunk.past-1  { opacity: 0.70; }
+.chunk.past-2  { opacity: 0.42; }
+.chunk.past-3  { opacity: 0.20; }
+.chunk.past-4  { opacity: 0.08; }
+.chunk.past-old { opacity: 0;   }
+
+/* ─── Erreur ──────────────────────────────────────────────────── */
+
+.chunk.error {
+  color: #cc4444;
+  border-left-color: #cc4444;
+}
