@@ -168,12 +168,28 @@ class VADChunker:
             n_frames = len(buffer)
 
             if n_frames >= _MAX_FRAMES:
-                # Hard cut: too long, flush everything
-                logger.info("VAD: max duration reached (%.1fs), forced flush", n_frames * _FRAME_DURATION_S)
-                self._flush(buffer)
-                buffer = []
-                probs = []
-                in_speech = False
+                # Max reached — find best dip in second half and cut with carry-over
+                # so we never lose the onset of the next word during continuous speech
+                search_start = _TARGET_FRAMES
+                search_probs = probs[search_start:]
+                min_local = int(np.argmin(search_probs))
+                dip_idx = search_start + min_local
+                cut_at = dip_idx + 1
+
+                to_flush = buffer[:cut_at]
+                carry_over = buffer[cut_at:]
+                carry_probs = probs[cut_at:]
+
+                logger.info(
+                    "VAD: max reached (%.1fs), dip-cut at frame %d (prob=%.2f), carry %.1fs",
+                    n_frames * _FRAME_DURATION_S, dip_idx, probs[dip_idx],
+                    len(carry_over) * _FRAME_DURATION_S,
+                )
+                self._flush(to_flush)
+
+                buffer = carry_over
+                probs = carry_probs
+                # Stay in_speech — continuous speech keeps flowing
                 silence_count = 0
 
             elif n_frames >= _TARGET_FRAMES:
