@@ -56,6 +56,19 @@ class Transcriber:
         self._transcript_q = transcript_queue
         self._stop = stop_event
         self._model = _load_model()
+        # Rolling buffer des dernières transcriptions arabes
+        # Injecté dans initial_prompt pour que Whisper connaisse le contexte du discours
+        self._recent: list[str] = []
+
+    def _build_prompt(self) -> str:
+        """Construit un prompt dynamique à partir des dernières transcriptions."""
+        base = config.WHISPER_INITIAL_PROMPT
+        if not self._recent:
+            return base
+        context = " ".join(self._recent[-config.WHISPER_CONTEXT_SENTENCES:])
+        # Limiter à 224 tokens max (limite Whisper) — ~900 caractères arabes
+        combined = f"{base} {context}"
+        return combined[-900:] if len(combined) > 900 else combined
 
     def _transcribe(self, audio: np.ndarray) -> str:
         t0 = time.perf_counter()
@@ -63,7 +76,7 @@ class Transcriber:
             audio,
             language="ar",
             beam_size=config.WHISPER_BEAM_SIZE,
-            initial_prompt=config.WHISPER_INITIAL_PROMPT,
+            initial_prompt=self._build_prompt(),
             condition_on_previous_text=True,
             vad_filter=False,
             temperature=0,
@@ -95,6 +108,11 @@ class Transcriber:
             if text in _WHISPER_HALLUCINATIONS or any(h in text for h in _WHISPER_HALLUCINATIONS):
                 logger.debug("Hallucination détectée, ignorée : %s", text)
                 continue
+
+            # Mémoriser pour enrichir le prochain prompt
+            self._recent.append(text)
+            if len(self._recent) > config.WHISPER_CONTEXT_SENTENCES:
+                self._recent.pop(0)
 
             try:
                 self._transcript_q.put(text, timeout=2)

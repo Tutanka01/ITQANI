@@ -10,20 +10,21 @@ load_dotenv(_ENV_FILE)
 SAMPLE_RATE = 16000
 CHUNK_FRAMES = 512  # required by silero-vad @ 16kHz
 
-# VAD
-VAD_THRESHOLD = 0.35           # compromis sensibilité / rejet du bruit
-VAD_PRE_ROLL_FRAMES = 8       # frames à garder avant la détection (~256ms de contexte)
-SILENCE_DURATION_MS = 600    # attendre 600ms de silence avant de couper
-CHUNK_MAX_DURATION_S = 15    # forcer la coupure à 15s max
-CHUNK_MIN_DURATION_S = 0.5   # ignorer uniquement les très courts bruits < 0.5s
+# VAD — optimisé pour parole forte et rapide
+VAD_THRESHOLD = 0.5            # haut : parole forte toujours au-dessus, rejette le bruit
+VAD_PRE_ROLL_FRAMES = 8        # ~256ms de contexte avant détection
+SILENCE_DURATION_MS = 350      # parole rapide = pauses courtes
+CHUNK_MAX_DURATION_S = 8       # forcer la coupure toutes les 8s max
+CHUNK_MIN_DURATION_S = 0.4     # ignorer uniquement les bruits < 0.4s
 
-# Whisper
+# Whisper — optimisé vitesse + qualité
 WHISPER_MODEL = "large-v3-turbo"
 WHISPER_COMPUTE_TYPE = "int8_float16"
 WHISPER_DEVICE = "cuda"
-WHISPER_BEAM_SIZE = 5          # beam 5 = meilleure précision sur l'arabe
-WHISPER_CPU_THREADS = 4        # threads CPU pour les ops CTranslate2 hors GPU
+WHISPER_BEAM_SIZE = 2          # beam 2 = rapide sur parole claire et forte
+WHISPER_CPU_THREADS = 4
 WHISPER_INITIAL_PROMPT = "بسم الله الرحمن الرحيم. هذه خطبة جمعة."
+WHISPER_CONTEXT_SENTENCES = 3  # nb de transcriptions récentes injectées dans le prompt
 
 # OpenRouter / LLM
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
