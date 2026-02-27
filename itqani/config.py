@@ -41,8 +41,8 @@ def _detect_device():
 
 WHISPER_DEVICE, WHISPER_COMPUTE_TYPE = _detect_device()
 
-WHISPER_MODEL = "large-v3-turbo"
-WHISPER_BEAM_SIZE = 1            # greedy = plus rapide, suffisant pour parole claire
+WHISPER_MODEL = "large-v3"       # meilleur que turbo pour le darija/dialectes
+WHISPER_BEAM_SIZE = 3            # meilleur décodage, coût faible avec un bon GPU
 WHISPER_CPU_THREADS = 4
 WHISPER_INITIAL_PROMPT = "خطبة جمعة باللغة العربية الفصحى والدارجة المغربية."
 WHISPER_CONTEXT_SENTENCES = 2    # réduit le risque de cascade
