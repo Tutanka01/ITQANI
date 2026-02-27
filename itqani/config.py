@@ -23,7 +23,7 @@ WHISPER_COMPUTE_TYPE = "int8_float16"
 WHISPER_DEVICE = "cuda"
 WHISPER_BEAM_SIZE = 2          # beam 2 = rapide sur parole claire et forte
 WHISPER_CPU_THREADS = 4
-WHISPER_INITIAL_PROMPT = "بسم الله الرحمن الرحيم. هذه خطبة جمعة."
+WHISPER_INITIAL_PROMPT = "خطبة جمعة باللغة العربية الفصحى والدارجة المغربية."
 WHISPER_CONTEXT_SENTENCES = 3  # nb de transcriptions récentes injectées dans le prompt
 
 # OpenRouter / LLM
