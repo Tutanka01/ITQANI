@@ -15,6 +15,7 @@ import logging
 import queue
 import signal
 import threading
+import traceback
 
 import uvicorn
 
@@ -27,6 +28,20 @@ from itqani.translation.translator import Translator
 from itqani import config
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_thread(name: str, target, stop_event: threading.Event):
+    """Wrapper : exécute target() et log les exceptions au lieu de crasher silencieusement."""
+    def _wrapper():
+        try:
+            target()
+        except Exception:
+            logger.critical(
+                "💥 Thread '%s' a crashé !\n%s", name, traceback.format_exc()
+            )
+            # Signal pour arrêter tout le pipeline proprement
+            stop_event.set()
+    return _wrapper
 
 
 class Pipeline:
@@ -102,7 +117,8 @@ class Pipeline:
             self.chunk_queue, self.transcript_queue, self.stop_event
         )
         whisper_thread = threading.Thread(
-            target=transcriber.run, name="transcriber", daemon=True
+            target=_safe_thread("transcriber", transcriber.run, self.stop_event),
+            name="transcriber", daemon=True,
         )
 
         # 3. Translator thread
@@ -110,17 +126,22 @@ class Pipeline:
             self.transcript_queue, sync_broadcast, self.context_manager, self.stop_event
         )
         translate_thread = threading.Thread(
-            target=translator.run, name="translator", daemon=True
+            target=_safe_thread("translator", translator.run, self.stop_event),
+            name="translator", daemon=True,
         )
 
         # 4. VAD thread
         vad = VADChunker(self.audio_queue, self.chunk_queue, self.stop_event)
-        vad_thread = threading.Thread(target=vad.run, name="vad", daemon=True)
+        vad_thread = threading.Thread(
+            target=_safe_thread("vad", vad.run, self.stop_event),
+            name="vad", daemon=True,
+        )
 
         # 5. Audio capture thread
         capture = AudioCapture(self.audio_queue, self.stop_event)
         audio_thread = threading.Thread(
-            target=capture.run, name="audio_capture", daemon=True
+            target=_safe_thread("audio_capture", capture.run, self.stop_event),
+            name="audio_capture", daemon=True,
         )
 
         # Start processing threads (order: models first, then audio)

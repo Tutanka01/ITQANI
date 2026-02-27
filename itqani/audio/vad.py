@@ -83,12 +83,14 @@ class VADChunker:
             logger.debug("VAD: chunk trop silencieux (rms=%.4f), ignoré", rms)
             return
 
-        # Normalisation
-        audio = audio * (0.1 / rms)
-        audio = np.clip(audio, -1.0, 1.0)
+        # Normalisation par peak — préserve la dynamique, amène le signal
+        # dans la plage que Whisper attend (proche de [-1, 1])
+        peak = np.max(np.abs(audio))
+        if peak > 0:
+            audio = audio * (0.9 / peak)
 
         duration = len(audio) / config.SAMPLE_RATE
-        logger.info("VAD: flushing chunk (%.2fs, rms=%.4f)", duration, rms)
+        logger.info("VAD: flushing chunk (%.2fs, rms=%.4f, peak=%.4f)", duration, rms, peak)
         try:
             self._chunk_q.put(audio, timeout=2)
         except queue.Full:

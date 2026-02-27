@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -6,14 +7,16 @@ from dotenv import load_dotenv
 _ENV_FILE = Path(__file__).parent.parent / ".env"
 load_dotenv(_ENV_FILE)
 
+_logger = logging.getLogger(__name__)
+
 # Audio
 SAMPLE_RATE = 16000
 CHUNK_FRAMES = 512  # required by silero-vad @ 16kHz
 
 # VAD — chunking hybride temporel + dip-aligné
-VAD_THRESHOLD = 0.5
+VAD_THRESHOLD = 0.35             # abaissé : meilleure détection de la parole
 VAD_PRE_ROLL_FRAMES = 5          # ~160ms
-VAD_MIN_RMS = 0.012
+VAD_MIN_RMS = 0.005              # abaissé : ne pas rejeter les micros faibles
 CHUNK_TARGET_S = 4.0             # cible : flush ~4 secondes
 CHUNK_MIN_S = 2.0                # jamais flush avant 2s
 CHUNK_MAX_S = 7.0                # forcer la coupure à 7s max
@@ -21,10 +24,24 @@ CHUNK_DIP_WINDOW = 10            # fenêtre glissante pour détecter les dips
 CHUNK_DIP_SOFT_THRESHOLD = 0.35  # prob en dessous = bon moment pour couper
 CHUNK_SILENCE_S = 0.8            # vrai silence pour flush (800ms — les respirations d'imam sont plus courtes)
 
-# Whisper — optimisé vitesse + qualité
+
+# ── Whisper — auto-détection du device ────────────────────────────
+def _detect_device():
+    """Détecte le meilleur device disponible pour faster-whisper (CTranslate2)."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            _logger.info("CUDA disponible — Whisper utilisera le GPU")
+            return "cuda", "float16"
+    except ImportError:
+        pass
+    _logger.info("Pas de CUDA — Whisper utilisera le CPU")
+    return "cpu", "int8"
+
+
+WHISPER_DEVICE, WHISPER_COMPUTE_TYPE = _detect_device()
+
 WHISPER_MODEL = "large-v3-turbo"
-WHISPER_COMPUTE_TYPE = "int8_float16"
-WHISPER_DEVICE = "cuda"
 WHISPER_BEAM_SIZE = 1            # greedy = plus rapide, suffisant pour parole claire
 WHISPER_CPU_THREADS = 4
 WHISPER_INITIAL_PROMPT = "خطبة جمعة باللغة العربية الفصحى والدارجة المغربية."
