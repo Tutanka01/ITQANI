@@ -17,6 +17,16 @@ from itqani import config
 
 logger = logging.getLogger(__name__)
 
+# Hallucinations connues de Whisper sur les silences ou courts clips
+_WHISPER_HALLUCINATIONS = {
+    "اشتركوا في القناة",
+    "ترجمة نانسي قنقر",
+    "شكرا للمشاهدة",
+    "شكراً للمشاهدة",
+    "للمشاهدة",
+    "اشتركوا",
+}
+
 
 def _load_model() -> WhisperModel:
     logger.info(
@@ -81,6 +91,9 @@ class Transcriber:
             text = self._transcribe(audio)
             if not text:
                 logger.debug("Empty transcription, skipping")
+                continue
+            if text in _WHISPER_HALLUCINATIONS or any(h in text for h in _WHISPER_HALLUCINATIONS):
+                logger.debug("Hallucination détectée, ignorée : %s", text)
                 continue
 
             try:

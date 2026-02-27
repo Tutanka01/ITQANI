@@ -23,6 +23,8 @@ Micro → AudioCapture → VADChunker → Transcriber → Translator → WebSock
 - GPU NVIDIA avec CUDA (recommandé) ou CPU
 - Clé API [OpenRouter](https://openrouter.ai)
 
+> **Note GPU Blackwell (RTX 50xx / RTX Pro 2000+) :** ces GPU nécessitent CUDA 12.8+. Utiliser le wheel `cu128` à l'étape 3.
+
 ---
 
 ## Installation
@@ -46,15 +48,22 @@ python -m pip install --upgrade pip
 
 **3. Installer PyTorch**
 
-Avec GPU NVIDIA (CUDA 12.4) :
+GPU NVIDIA — architecture **Ampere / Ada (RTX 30xx / 40xx)** :
 ```powershell
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+```
+
+GPU NVIDIA — architecture **Blackwell (RTX 50xx / RTX Pro 2000+)** :
+```powershell
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 ```
 
 Sans GPU (CPU) :
 ```powershell
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 ```
+
+> En cas d'erreur `CUBLAS_STATUS_NOT_SUPPORTED` au lancement, la version CUDA est incompatible avec ton GPU. Essaie le wheel supérieur ou bascule sur CPU (voir section Configuration).
 
 **4. Installer les dépendances :**
 

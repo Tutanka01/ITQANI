@@ -12,9 +12,9 @@ CHUNK_FRAMES = 512  # required by silero-vad @ 16kHz
 
 # VAD
 VAD_THRESHOLD = 0.5
-SILENCE_DURATION_MS = 350    # was 600 — flushes chunks 250ms plus tôt
-CHUNK_MAX_DURATION_S = 8     # was 10 — force-flush un peu plus tôt
-CHUNK_MIN_DURATION_S = 0.5   # was 1.0 — accepte les phrases courtes
+SILENCE_DURATION_MS = 700    # attendre 700ms de silence avant de couper
+CHUNK_MAX_DURATION_S = 15    # forcer la coupure à 15s max
+CHUNK_MIN_DURATION_S = 2.0   # ignorer les chunks < 2s (bruit, hallucinations)
 
 # Whisper
 WHISPER_MODEL = "large-v3-turbo"
