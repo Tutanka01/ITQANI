@@ -6,21 +6,17 @@ finalized float32 numpy audio chunks into chunk_queue.
 
 Chunking algorithm
 ──────────────────
-Instead of waiting for a long silence that never comes (continuous speech),
-we flush approximately every CHUNK_TARGET_S seconds, aligning the cut on
-the frame where speech probability dips the most (breath, micro-pause).
+Optimised for continuous loud speech (khutba) where long silences never come.
 
-1. Speech detected (prob ≥ VAD_THRESHOLD) → accumulate frames + probabilities
-2. When duration ≥ CHUNK_TARGET_S:
-   - Look for the lowest prob in the last CHUNK_DIP_WINDOW frames
-   - If prob_min < CHUNK_DIP_SOFT_THRESHOLD → cut at the dip (carry-over)
-   - Otherwise → wait a bit longer (up to CHUNK_MAX_S)
-3. When duration ≥ CHUNK_MAX_S → forced flush (hard cut)
-4. Prolonged silence (prob < threshold for ~500ms) → normal flush
+1. Speech detected (prob ≥ VAD_THRESHOLD) → accumulate frames
+2. When duration ≥ CHUNK_TARGET_S → ALWAYS cut:
+   - If a dip (low prob) exists in last frames → cut at dip (carry-over)
+   - Otherwise → cut everything anyway (never wait)
+3. CHUNK_MAX_S is a safety net only
+4. True silence (≥ CHUNK_SILENCE_S) → normal flush
 5. Chunks shorter than CHUNK_MIN_S → discarded (noise)
 
-Carry-over: when cutting at a dip, frames after the dip become the start
-of the next chunk. No audio is lost.
+Key rule: at TARGET, we ALWAYS flush. No waiting.
 """
 
 import logging
@@ -40,7 +36,7 @@ _FRAME_DURATION_S = config.CHUNK_FRAMES / config.SAMPLE_RATE  # ~0.032s per fram
 _TARGET_FRAMES = int(config.CHUNK_TARGET_S / _FRAME_DURATION_S)
 _MIN_FRAMES = int(config.CHUNK_MIN_S / _FRAME_DURATION_S)
 _MAX_FRAMES = int(config.CHUNK_MAX_S / _FRAME_DURATION_S)
-_SILENCE_FRAMES = int(config.CHUNK_SILENCE_S / _FRAME_DURATION_S)  # ~800ms of true silence → flush
+_SILENCE_FRAMES = int(config.CHUNK_SILENCE_S / _FRAME_DURATION_S)
 
 
 def _load_silero_vad():
@@ -98,26 +94,23 @@ class VADChunker:
         except queue.Full:
             logger.warning("chunk_queue full — dropping audio chunk")
 
-    def _find_best_dip(
-        self, probs: List[float]
-    ) -> Tuple[int, float]:
-        """Find the frame index with the lowest prob in the last DIP_WINDOW frames.
-
-        Returns (index_from_end, min_prob). index_from_end is relative to the
-        END of the probs list (0 = last frame).
-        """
+    def _find_best_dip(self, probs: List[float]) -> Tuple[int, float]:
+        """Find the frame with the lowest prob in the last DIP_WINDOW frames."""
         window = min(config.CHUNK_DIP_WINDOW, len(probs))
         search = probs[-window:]
         min_idx = int(np.argmin(search))
         min_prob = search[min_idx]
-        # Convert to absolute index in probs
         abs_idx = len(probs) - window + min_idx
         return abs_idx, min_prob
 
     def run(self):
-        logger.info("VADChunker started (target=%.1fs, max=%.1fs)", config.CHUNK_TARGET_S, config.CHUNK_MAX_S)
+        logger.info(
+            "VADChunker started (target=%.1fs, min=%.1fs, max=%.1fs, silence=%.1fs)",
+            config.CHUNK_TARGET_S, config.CHUNK_MIN_S,
+            config.CHUNK_MAX_S, config.CHUNK_SILENCE_S,
+        )
         buffer: List[np.ndarray] = []
-        probs: List[float] = []  # speech prob per buffered frame
+        probs: List[float] = []
         pre_roll: List[np.ndarray] = []
         in_speech = False
         silence_count = 0
@@ -137,7 +130,7 @@ class VADChunker:
                 if not in_speech:
                     # Start of speech: include pre-roll
                     buffer.extend(pre_roll)
-                    probs.extend([0.0] * len(pre_roll))  # pre-roll has no speech prob
+                    probs.extend([0.0] * len(pre_roll))
                     pre_roll = []
                 buffer.append(frame)
                 probs.append(prob)
@@ -149,11 +142,9 @@ class VADChunker:
                 probs.append(prob)
                 silence_count += 1
 
-                # True silence (800ms) → normal flush
+                # True silence → normal flush
                 if silence_count >= _SILENCE_FRAMES:
-                    logger.debug("VAD: silence detected (%.0fms), flushing", silence_count * _FRAME_DURATION_S * 1000)
-                    # Seed pre_roll with tail of buffer so we never lose the
-                    # onset of the next word after a breath/pause
+                    logger.debug("VAD: silence (%.0fms), flushing", silence_count * _FRAME_DURATION_S * 1000)
                     pre_roll = list(buffer[-config.VAD_PRE_ROLL_FRAMES:])
                     self._flush(buffer)
                     buffer = []
@@ -167,58 +158,39 @@ class VADChunker:
                 if len(pre_roll) > config.VAD_PRE_ROLL_FRAMES:
                     pre_roll.pop(0)
 
-            # --- Hybrid temporal + dip-aligned chunking ---
+            # --- Temporal flush: ALWAYS cut at TARGET, never wait ---
             n_frames = len(buffer)
 
-            if n_frames >= _MAX_FRAMES:
-                # Max reached — find best dip in second half and cut with carry-over
-                # so we never lose the onset of the next word during continuous speech
-                search_start = _TARGET_FRAMES
-                search_probs = probs[search_start:]
-                min_local = int(np.argmin(search_probs))
-                dip_idx = search_start + min_local
-                cut_at = dip_idx + 1
-
-                to_flush = buffer[:cut_at]
-                carry_over = buffer[cut_at:]
-                carry_probs = probs[cut_at:]
-
-                logger.info(
-                    "VAD: max reached (%.1fs), dip-cut at frame %d (prob=%.2f), carry %.1fs",
-                    n_frames * _FRAME_DURATION_S, dip_idx, probs[dip_idx],
-                    len(carry_over) * _FRAME_DURATION_S,
-                )
-                self._flush(to_flush)
-
-                buffer = carry_over
-                probs = carry_probs
-                # Stay in_speech — continuous speech keeps flowing
-                silence_count = 0
-
-            elif n_frames >= _TARGET_FRAMES:
-                # Look for a good dip to cut on
+            if n_frames >= _TARGET_FRAMES:
                 dip_idx, dip_prob = self._find_best_dip(probs)
 
                 if dip_prob < config.CHUNK_DIP_SOFT_THRESHOLD:
-                    # Good dip found — cut at dip, carry over the rest
-                    cut_at = dip_idx + 1  # include the dip frame in the flushed chunk
+                    # Good dip found → cut there, carry-over the rest
+                    cut_at = dip_idx + 1
                     to_flush = buffer[:cut_at]
                     carry_over = buffer[cut_at:]
                     carry_probs = probs[cut_at:]
 
-                    logger.debug(
-                        "VAD: dip-aligned cut at frame %d (prob=%.2f), flush %.1fs, carry %.1fs",
-                        dip_idx, dip_prob,
-                        len(to_flush) * _FRAME_DURATION_S,
+                    logger.info(
+                        "VAD: dip-cut at %.2fs (prob=%.2f), carry %.2fs",
+                        len(to_flush) * _FRAME_DURATION_S, dip_prob,
                         len(carry_over) * _FRAME_DURATION_S,
                     )
                     self._flush(to_flush)
-
-                    # Carry-over becomes the new buffer
                     buffer = carry_over
                     probs = carry_probs
-                    # Stay in_speech — the carry-over continues
-                    silence_count = 0
+                else:
+                    # No good dip → cut everything anyway, don't wait!
+                    logger.info(
+                        "VAD: target cut at %.2fs (no dip, best=%.2f)",
+                        n_frames * _FRAME_DURATION_S, dip_prob,
+                    )
+                    self._flush(buffer)
+                    buffer = []
+                    probs = []
+
+                # in_speech stays True — continuous speech keeps flowing
+                silence_count = 0
 
         # Flush remaining on shutdown
         if buffer:
