@@ -11,10 +11,11 @@ SAMPLE_RATE = 16000
 CHUNK_FRAMES = 512  # required by silero-vad @ 16kHz
 
 # VAD
-VAD_THRESHOLD = 0.4            # légèrement plus sensible
+VAD_THRESHOLD = 0.3            # sensible — capte mieux la parole faible
+VAD_PRE_ROLL_FRAMES = 8       # frames à garder avant la détection (~256ms de contexte)
 SILENCE_DURATION_MS = 600    # attendre 600ms de silence avant de couper
 CHUNK_MAX_DURATION_S = 15    # forcer la coupure à 15s max
-CHUNK_MIN_DURATION_S = 0.8   # ignorer uniquement les très courts bruits < 0.8s
+CHUNK_MIN_DURATION_S = 0.5   # ignorer uniquement les très courts bruits < 0.5s
 
 # Whisper
 WHISPER_MODEL = "large-v3-turbo"
@@ -27,7 +28,7 @@ WHISPER_INITIAL_PROMPT = "بسم الله الرحمن الرحيم. هذه خط
 # OpenRouter / LLM
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = "google/gemini-3-flash-preview"
+OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
 OPENROUTER_TEMPERATURE = 0.1
 
 # Translation resilience

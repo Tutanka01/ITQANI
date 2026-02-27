@@ -83,6 +83,7 @@ class VADChunker:
     def run(self):
         logger.info("VADChunker started")
         buffer: List[np.ndarray] = []
+        pre_roll: List[np.ndarray] = []  # frames avant la détection de parole
         in_speech = False
         silence_count = 0
 
@@ -90,7 +91,6 @@ class VADChunker:
             try:
                 frame = self._audio_q.get(timeout=0.1)
             except queue.Empty:
-                # If stop requested and we have accumulated audio, flush it
                 if self._stop.is_set() and buffer:
                     self._flush(buffer)
                 continue
@@ -99,11 +99,16 @@ class VADChunker:
             is_speech = prob >= config.VAD_THRESHOLD
 
             if is_speech:
+                if not in_speech:
+                    # Début de parole : inclure le pre-roll pour ne pas perdre
+                    # le début des mots
+                    buffer.extend(pre_roll)
+                    pre_roll = []
                 buffer.append(frame)
                 in_speech = True
                 silence_count = 0
             elif in_speech:
-                # Silence after speech — keep accumulating until threshold
+                # Silence après parole — accumuler jusqu'au seuil
                 buffer.append(frame)
                 silence_count += 1
                 if silence_count >= _SILENCE_FRAMES:
@@ -111,7 +116,11 @@ class VADChunker:
                     buffer = []
                     in_speech = False
                     silence_count = 0
-            # else: pre-speech silence — discard
+            else:
+                # Silence avant parole — garder dans le pre-roll circulaire
+                pre_roll.append(frame)
+                if len(pre_roll) > config.VAD_PRE_ROLL_FRAMES:
+                    pre_roll.pop(0)
 
             # Forced flush on max duration
             if len(buffer) >= _MAX_FRAMES:
