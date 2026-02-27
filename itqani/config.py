@@ -18,7 +18,7 @@ CHUNK_MIN_DURATION_S = 0.5   # was 1.0 — accepte les phrases courtes
 
 # Whisper
 WHISPER_MODEL = "large-v3-turbo"
-WHISPER_COMPUTE_TYPE = "int8_float16"  # was float16 — moins de VRAM, légèrement plus rapide
+WHISPER_COMPUTE_TYPE = "int8"  # int8_float16 requiert tensor cores (GPU récent)
 WHISPER_DEVICE = "cuda"
 WHISPER_BEAM_SIZE = 3          # was 5 — sufficient pour l'arabe, ~40% plus rapide
 WHISPER_CPU_THREADS = 4        # threads CPU pour les ops CTranslate2 hors GPU
