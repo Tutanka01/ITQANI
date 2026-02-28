@@ -7,8 +7,8 @@
 :root {
   --accent:      #c9a227;
   --bg:          #0b0b0f;
-  --text:        #f0ece6;
-  --text-past:   #a8a29e;
+  --text:        #ffffff;
+  --text-past:   #d0cec9;
   --status-h:    38px;
   --pad-h:       clamp(2.5rem, 10vw, 16rem);
   --font-sz:     clamp(2rem, 3.4vw, 3.2rem);
@@ -190,7 +190,7 @@ html, body {
 
 .chunk.done {
   color: var(--text-past);
-  border-left-color: rgba(201, 162, 39, 0.12);
+  border-left-color: rgba(255, 255, 255, 0.06);
   transition: color 0.8s ease, border-color 0.8s ease;
 }
 
