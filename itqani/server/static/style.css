@@ -120,18 +120,16 @@ html, body {
   transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-/* Masque dégradé haut — fondu doux */
+/* Masque dégradé haut — léger, juste pour adoucir la sortie */
 #stage::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 45%;
+  height: 20%;
   background: linear-gradient(
     to bottom,
     var(--bg) 0%,
-    var(--bg) 15%,
-    rgba(5, 5, 7, 0.85) 40%,
-    rgba(5, 5, 7, 0.4) 65%,
+    rgba(5, 5, 7, 0.5) 50%,
     transparent 100%
   );
   pointer-events: none;
@@ -189,9 +187,9 @@ html, body {
 
 .chunk.active {
   opacity: 1;
-  color: #fff;
+  color: #ffffff;
   border-left-color: var(--gold);
-  text-shadow: 0 0 40px rgba(212, 168, 67, 0.06);
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.1);
 }
 
 /* Curseur clignotant pendant le streaming */
@@ -211,35 +209,31 @@ html, body {
 /* ─── Chunks passés — fondu progressif ────────────────────────── */
 
 .chunk.past-1 {
-  opacity: 0.6;
-  color: var(--text);
-  border-left-color: rgba(212, 168, 67, 0.2);
+  opacity: 0.85;
+  color: #ddd8d2;
+  border-left-color: rgba(212, 168, 67, 0.25);
 }
 
 .chunk.past-2 {
-  opacity: 0.35;
-  color: var(--text-dim);
+  opacity: 0.6;
+  color: #bbb5ad;
   border-left-color: transparent;
-  transform: scale(0.995);
 }
 
 .chunk.past-3 {
-  opacity: 0.15;
+  opacity: 0.38;
   color: var(--text-dim);
-  filter: blur(0.3px);
-  transform: scale(0.99);
 }
 
 .chunk.past-4 {
-  opacity: 0.06;
-  filter: blur(0.6px);
-  transform: scale(0.985);
+  opacity: 0.18;
+  color: var(--text-dim);
+  filter: blur(0.3px);
 }
 
 .chunk.past-old {
   opacity: 0;
-  filter: blur(1px);
-  transform: scale(0.98);
+  filter: blur(0.5px);
 }
 
 /* ─── Erreur ──────────────────────────────────────────────────── */
