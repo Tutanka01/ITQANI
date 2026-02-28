@@ -6,7 +6,7 @@
   <title>Itqani — Traduction en direct</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;350;400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -20,7 +20,9 @@
   </div>
 
   <div id="waiting">
-    <div id="waiting-icon"></div>
+    <div class="waiting-bars">
+      <span></span><span></span><span></span><span></span>
+    </div>
     <div id="waiting-text">En attente de traduction</div>
   </div>
 
@@ -29,78 +31,60 @@
   </div>
 
   <script>
-    const container   = document.getElementById('scroll-container');
-    const statusDot   = document.getElementById('status-dot');
-    const statusLbl   = document.getElementById('status-label');
-    const clockEl     = document.getElementById('clock');
-    const waitingEl   = document.getElementById('waiting');
+    const scroller   = document.getElementById('scroll-container');
+    const statusDot  = document.getElementById('status-dot');
+    const statusLbl  = document.getElementById('status-label');
+    const clockEl    = document.getElementById('clock');
+    const waitingEl  = document.getElementById('waiting');
 
-    // ── Horloge (mise à jour chaque seconde pour les minutes) ────
-    function updateClock() {
-      clockEl.textContent = new Date().toLocaleTimeString('fr-FR', {
-        hour: '2-digit', minute: '2-digit'
-      });
+    // ── Horloge ─────────────────────────────────────────────────
+    function tick() {
+      clockEl.textContent = new Date().toLocaleTimeString('fr-FR',
+        { hour: '2-digit', minute: '2-digit' });
     }
-    updateClock();
-    setInterval(updateClock, 1000);
+    tick();
+    setInterval(tick, 1000);
 
     // ── État ─────────────────────────────────────────────────────
-    let activeChunk   = null;
-    let ws            = null;
-    let retryDelay    = 1000;
-    let hasReceivedContent = false;
-    const MAX_DELAY   = 30000;
-    const PAST        = ['past-1', 'past-2', 'past-3', 'past-4', 'past-old'];
-    const MAX_CHUNKS  = 12;  // nettoyage DOM pour la performance
+    let active       = null;   // chunk en cours de streaming
+    let ws           = null;
+    let retryDelay   = 1000;
+    let firstContent = false;
+    const MAX_DELAY  = 30000;
+    const MAX_CHUNKS = 40;     // garder assez de texte pour relire
 
-    // ── Écran d'attente ─────────────────────────────────────────
+    // ── Helpers ─────────────────────────────────────────────────
     function hideWaiting() {
-      if (!hasReceivedContent) {
-        hasReceivedContent = true;
+      if (!firstContent) {
+        firstContent = true;
         waitingEl.classList.add('hidden');
       }
     }
 
-    // ── Nettoyage DOM ───────────────────────────────────────────
-    // Supprimer les chunks les plus anciens pour éviter l'accumulation
-    function cleanupOldChunks() {
-      const chunks = container.querySelectorAll('.chunk');
-      if (chunks.length > MAX_CHUNKS) {
-        const toRemove = chunks.length - MAX_CHUNKS;
-        for (let i = 0; i < toRemove; i++) {
-          chunks[i].remove();
+    function scrollToBottom() {
+      // Smooth scroll vers le dernier chunk
+      scroller.scrollTo({
+        top: scroller.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+
+    function cleanup() {
+      const all = scroller.querySelectorAll('.chunk');
+      if (all.length > MAX_CHUNKS) {
+        for (let i = 0; i < all.length - MAX_CHUNKS; i++) {
+          all[i].remove();
         }
       }
     }
 
-    // ── Vieillissement des chunks ───────────────────────────────
-    function ageAllPast() {
-      [...container.querySelectorAll('.chunk:not(.active)')].reverse().forEach(el => {
-        for (let i = PAST.length - 1; i >= 0; i--) {
-          if (el.classList.contains(PAST[i])) {
-            if (i === PAST.length - 1) {
-              // past-old : supprimer après la transition
-              el.addEventListener('transitionend', () => el.remove(), { once: true });
-              // Fallback si la transition ne se déclenche pas
-              setTimeout(() => { if (el.parentNode) el.remove(); }, 1200);
-            } else {
-              el.classList.replace(PAST[i], PAST[i + 1]);
-            }
-            break;
-          }
-        }
-      });
-    }
-
-    // ── Finaliser le chunk actif → past-1 ───────────────────────
+    // ── Finaliser le chunk actif ────────────────────────────────
     function finalizeActive() {
-      if (!activeChunk) return;
-      const chunk = activeChunk;
-      activeChunk = null;
-      ageAllPast();
-      chunk.classList.remove('active');
-      chunk.classList.add('past-1');
-      cleanupOldChunks();
+      if (!active) return;
+      active.classList.remove('active');
+      active.classList.add('done');
+      active = null;
+      cleanup();
     }
 
     // ── Créer un nouveau chunk actif ────────────────────────────
@@ -110,68 +94,51 @@
 
       const div = document.createElement('div');
       div.className = 'chunk active';
-      container.appendChild(div);
-      activeChunk = div;
+      scroller.appendChild(div);
+      active = div;
 
-      // Scroll doux vers le bas pour garder le chunk actif visible
-      requestAnimationFrame(() => {
-        div.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      });
-
+      requestAnimationFrame(scrollToBottom);
       return div;
     }
 
-    // ── Messages WebSocket ──────────────────────────────────────
+    // ── WebSocket messages ──────────────────────────────────────
     function handleMessage(event) {
       let msg;
       try { msg = JSON.parse(event.data); } catch { return; }
 
       if (msg.type === 'token') {
-        if (!activeChunk) createActive();
-        activeChunk.textContent += msg.content;
+        if (!active) createActive();
+        active.textContent += msg.content;
+        // Scroll continu pendant le streaming
+        requestAnimationFrame(scrollToBottom);
 
       } else if (msg.type === 'chunk_end') {
-        if (activeChunk) activeChunk.textContent = msg.content;
+        if (active) active.textContent = msg.content;
         finalizeActive();
+        requestAnimationFrame(scrollToBottom);
 
       } else if (msg.type === 'error') {
-        const errChunk = createActive();
-        errChunk.textContent = msg.content;
-        errChunk.classList.add('error');
+        const el = createActive();
+        el.textContent = msg.content;
+        el.classList.add('error');
         setTimeout(finalizeActive, 5000);
       }
     }
 
-    // ── Connexion WebSocket avec reconnexion automatique ────────
-    function setStatus(connected) {
-      statusDot.classList.toggle('connected', connected);
-      if (connected) {
-        statusLbl.textContent = 'En direct';
-        statusLbl.classList.add('live');
-      } else {
-        statusLbl.textContent = 'Reconnexion';
-        statusLbl.classList.remove('live');
-      }
+    // ── WebSocket connexion ─────────────────────────────────────
+    function setStatus(on) {
+      statusDot.classList.toggle('connected', on);
+      statusLbl.textContent = on ? 'En direct' : 'Reconnexion';
+      statusLbl.classList.toggle('live', on);
     }
 
     function connect() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       ws = new WebSocket(`${proto}://${location.host}/ws`);
-
-      ws.addEventListener('open', () => {
-        setStatus(true);
-        retryDelay = 1000;
-      });
-
+      ws.addEventListener('open',    () => { setStatus(true);  retryDelay = 1000; });
       ws.addEventListener('message', handleMessage);
-
-      ws.addEventListener('close', () => {
-        setStatus(false);
-        setTimeout(connect, retryDelay);
-        retryDelay = Math.min(retryDelay * 2, MAX_DELAY);
-      });
-
-      ws.addEventListener('error', () => ws.close());
+      ws.addEventListener('close',   () => { setStatus(false); setTimeout(connect, retryDelay); retryDelay = Math.min(retryDelay * 2, MAX_DELAY); });
+      ws.addEventListener('error',   () => ws.close());
     }
 
     connect();
